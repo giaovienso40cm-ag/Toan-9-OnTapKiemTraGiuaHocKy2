@@ -103,13 +103,14 @@
             cursor: pointer;
             transition: all 0.2s ease-in-out;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
+      }
 
-        .btn-action:hover {
+        /* Vô hiệu hóa hover nếu nút bị disable */
+        .btn-action:not(:disabled):hover {
             filter: brightness(1.1); transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0, 0, 0, 0.4);
         }
 
-        .btn-action:active {
+        .btn-action:not(:disabled):active {
             filter: brightness(0.9); transform: translateY(2px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
@@ -177,7 +178,9 @@
             <h2 style="color: var(--gold);">KẾT QUẢ BÀI LÀM</h2>
             <p id="final-score" style="font-size: 2.2rem; font-weight: bold;"></p>
             <p id="detail-score" style="font-size: 1.2rem; margin-bottom: 25px; color: #a5d6a7;"></p>
-            <button class="btn-action" onclick="sendPoints()">NỘP BÀI LÊN HỆ THỐNG</button>
+            <!-- ĐÃ THÊM ID CHO NÚT NÀY ĐỂ ĐIỀU KHIỂN -->
+            <button id="btn-submit-score" class="btn-action" onclick="sendPoints()">NỘP BÀI LÊN HỆ THỐNG</button>
+            
             <button class="btn-action" style="background:#b0bec5; margin-top:15px;" onclick="restartQuiz()">LÀM LẠI TỪ ĐẦU</button>
             <div id="thanks-note" style="margin-top:30px; color: var(--gold); font-size: 1.2rem; font-weight: bold;"></div>
         </div>
@@ -253,6 +256,7 @@
     let rawScore = 0; 
     let retries = 0;
     let sN = "", sC = "";
+     let isSubmitting = false; // BIẾN CỜ ĐỂ KHÓA NÚT NỘP BÀI
     const MAX_RAW_SCORE = 23; // 10 (MC) + 8 (TF) + 5 (SA)
     
     // --- TIMER ---
@@ -438,8 +442,33 @@
         document.getElementById('detail-score').innerText = `(Đạt ${rawScore}/${MAX_RAW_SCORE} ý đúng)`;
     }
 
+     // --- HÀM GỬI ĐIỂM ĐÃ ĐƯỢC CHỐNG SPAM (DEBOUNCE) ---
     function sendPoints() {
-        if(SCRIPT_URL.includes("DÁN_LINK")) return alert("Em làm tốt lắm. Thầy/Cô đã nhận được bài của em");
+        // Nếu đang trong quá trình nộp thì chặn không cho chạy lệnh phía dưới
+        if (isSubmitting) return; 
+
+        const btnSubmit = document.getElementById('btn-submit-score');
+        const thanksNote = document.getElementById('thanks-note');
+
+        // Bật cờ khóa nút
+        isSubmitting = true; 
+        
+        // Đổi giao diện nút để học sinh biết là hệ thống đang xử lý
+        btnSubmit.innerText = "ĐANG NỘP BÀI... VUI LÒNG CHỜ";
+        btnSubmit.style.opacity = "0.7";
+        btnSubmit.style.cursor = "not-allowed";
+        btnSubmit.disabled = true; // Khóa hẳn nút bấm trên HTML
+
+        if(SCRIPT_URL.includes("DÁN_LINK")) {
+            // Hiệu ứng khi chưa dán link thật
+            setTimeout(() => {
+                btnSubmit.innerText = "ĐÃ NỘP BÀI THÀNH CÔNG";
+                btnSubmit.style.background = "#4caf50";
+                btnSubmit.style.color = "white";
+                thanksNote.innerText = "Em làm tốt lắm. Thầy/Cô đã nhận được bài của em";
+            }, 1000);
+            return;
+        }
         
         const tenTrangTinh = "GiuaKy2_Toan9"; 
         let finalScoreScale10 = Math.round((rawScore / MAX_RAW_SCORE) * 10 * 10) / 10;
@@ -456,12 +485,37 @@
             }) 
         })
         .then(() => {
-            document.getElementById('thanks-note').innerText = "Em làm tốt lắm. Thầy/Cô đã nhận được bài của em";
+            // Khi nộp thành công
+            btnSubmit.innerText = "ĐÃ NỘP BÀI THÀNH CÔNG";
+            btnSubmit.style.background = "#4caf50"; // Đổi sang màu xanh lá
+            btnSubmit.style.color = "white";
+            thanksNote.innerText = "Em làm tốt lắm. Thầy/Cô đã nhận được bài của em";
+        })
+        .catch(() => {
+            // Lỗi mạng, mở khóa nút cho học sinh nộp lại
+            alert("Có lỗi kết nối mạng. Em vui lòng bấm nộp lại nhé!");
+            isSubmitting = false;
+            btnSubmit.innerText = "NỘP LẠI BÀI";
+            btnSubmit.style.opacity = "1";
+            btnSubmit.style.cursor = "pointer";
+            btnSubmit.disabled = false;
         });
     }
 
     function restartQuiz() {
         curr = 0; rawScore = 0; retries++;
+        
+        // --- RESET LẠI TRẠNG THÁI NÚT NỘP BÀI KHI LÀM LẠI TỪ ĐẦU ---
+        isSubmitting = false;
+        const btnSubmit = document.getElementById('btn-submit-score');
+        btnSubmit.innerText = "NỘP BÀI LÊN HỆ THỐNG";
+        btnSubmit.style.background = "var(--gold)";
+        btnSubmit.style.color = "#000";
+        btnSubmit.style.opacity = "1";
+        btnSubmit.style.cursor = "pointer";
+        btnSubmit.disabled = false;
+        // -------------------------------------------------------------
+
         document.getElementById('result-screen').classList.remove('active');
         document.getElementById('quiz-screen').classList.add('active');
         document.getElementById('thanks-note').innerText = "";
@@ -487,7 +541,7 @@
     }
 </script>
 </body>
-
 </html>
+
 
 
